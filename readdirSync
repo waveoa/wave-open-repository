@@ -2,9 +2,8 @@ const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const moment = require('moment');
-const { readdirSync } = require('fs');
 
-// Initialize the client
+// Initialize the bot
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -16,50 +15,27 @@ const client = new Client({
     ]
 });
 
-// Command collection and cooldowns
 client.commands = new Collection();
 client.cooldowns = new Collection();
-
-// Prefix for commands
-const PREFIX = '!wave';
-
-// Path to commands directory
-const COMMANDS_DIR = path.join(__dirname, 'commands');
+client.prefix = '!wave';
 
 // Load commands
-const loadCommands = () => {
-    client.commands.clear();  // Clear the previous commands
-    const commandFiles = readdirSync(COMMANDS_DIR).filter(file => file.endsWith('.js'));
-    for (const file of commandFiles) {
-        const command = require(path.join(COMMANDS_DIR, file));
-        client.commands.set(command.name, command);
-    }
-    console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Loaded ${client.commands.size} commands.`);
-};
+const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
+for (const file of commandFiles) {
+    const command = require(`./commands/${file}`);
+    client.commands.set(command.name, command);
+}
 
-// Reload commands
-const reloadCommands = () => {
-    console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Reloading commands...`);
-    loadCommands();
-};
-
-// Initial load of commands
-loadCommands();
-
-// Event: Bot is ready
+// Event handlers
 client.once('ready', () => {
-    console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Bot is online as ${client.user.tag}`);
+    console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Wave bot is online!`);
     client.user.setActivity('the waves', { type: 'LISTENING' });
-    setInterval(() => {
-        console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Bot is still active.`);
-    }, 3600000); // Log every hour
 });
 
-// Event: Message creation
 client.on('messageCreate', async message => {
-    if (!message.content.startsWith(PREFIX) || message.author.bot) return;
+    if (!message.content.startsWith(client.prefix) || message.author.bot) return;
 
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
+    const args = message.content.slice(client.prefix.length).trim().split(/ +/);
     const commandName = args.shift().toLowerCase();
 
     const command = client.commands.get(commandName)
@@ -81,7 +57,7 @@ client.on('messageCreate', async message => {
     if (command.args && !args.length) {
         let reply = `You didn't provide any arguments, ${message.author}!`;
         if (command.usage) {
-            reply += `\nThe proper usage would be: \`${PREFIX}${command.name} ${command.usage}\``;
+            reply += `\nThe proper usage would be: \`${client.prefix}${command.name} ${command.usage}\``;
         }
         return message.channel.send(reply);
     }
@@ -116,17 +92,122 @@ client.on('messageCreate', async message => {
     }
 });
 
-// Event: Handling errors
+client.on('guildMemberAdd', member => {
+    const welcomeChannel = member.guild.channels.cache.find(channel => channel.name === 'welcome');
+    if (!welcomeChannel) return;
+    welcomeChannel.send(`Welcome to the server, ${member.user.tag}! Make sure to read the rules and have fun! 🌊`);
+});
+
+client.on('guildMemberRemove', member => {
+    const goodbyeChannel = member.guild.channels.cache.find(channel => channel.name === 'goodbye');
+    if (!goodbyeChannel) return;
+    goodbyeChannel.send(`${member.user.tag} has left the server. Farewell! 🌊`);
+});
+
+client.on('voiceStateUpdate', (oldState, newState) => {
+    if (!oldState.channel && newState.channel) {
+        console.log(`${newState.member.user.tag} joined voice channel ${newState.channel.name}`);
+    } else if (oldState.channel && !newState.channel) {
+        console.log(`${oldState.member.user.tag} left voice channel ${oldState.channel.name}`);
+    }
+});
+
+client.on('guildCreate', guild => {
+    console.log(`Joined new guild: ${guild.name}`);
+    const defaultChannel = guild.channels.cache.find(channel => channel.type === 'GUILD_TEXT');
+    if (defaultChannel) {
+        defaultChannel.send('Hello! I am Wave, your new bot! 🌊');
+    }
+});
+
+client.on('guildDelete', guild => {
+    console.log(`Left guild: ${guild.name}`);
+});
+
 client.on('error', console.error);
 client.on('warn', console.warn);
 
-// Watch for file changes to reload commands
-fs.watch(COMMANDS_DIR, (eventType, filename) => {
-    if (filename && filename.endsWith('.js')) {
-        console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Detected changes in commands directory. Reloading commands...`);
-        reloadCommands();
-    }
-});
+// Command Files
+const commandsDir = path.join(__dirname, 'commands');
+if (!fs.existsSync(commandsDir)) {
+    fs.mkdirSync(commandsDir);
+}
+
+// Example Commands
+const /wave = `
+module.exports = {
+    name: 'wave',
+    description: 'Sends a wave back to the user!',
+    cooldown: 5,
+    execute(message, args) {
+        message.channel.send('🌊 Hello there!');
+    },
+};
+`;
+
+const pingCommand = `
+module.exports = {
+    name: 'ping',
+    description: 'Ping!',
+    cooldown: 10,
+    execute(message) {
+        message.channel.send('Pong!');
+    },
+};
+`;
+
+const jokeCommand = `
+module.exports = {
+    name: 'joke',
+    description: 'Tells a random joke.',
+    cooldown: 10,
+    execute(message) {
+        const jokes = [
+            'Why don’t scientists trust atoms? Because they make up everything!',
+            'Why did the scarecrow win an award? Because he was outstanding in his field!',
+            'What do you call fake spaghetti? An impasta!',
+        ];
+        const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
+        message.channel.send(randomJoke);
+    },
+};
+`;
+
+const avatarCommand = `
+module.exports = {
+    name: 'avatar',
+    description: 'Displays the avatar of the user.',
+    args: true,
+    usage: '<user>',
+    execute(message, args) {
+        const user = message.mentions.users.first() || message.author;
+        message.channel.send(user.displayAvatarURL({ format: 'png', dynamic: true }));
+    },
+};
+`;
+
+const serverInfoCommand = `
+module.exports = {
+    name: 'serverinfo',
+    description: 'Displays information about the server.',
+    execute(message) {
+        const server = message.guild;
+        const info = \`Server name: ${server.name}\nTotal members: ${server.memberCount}\nRegion: ${server.region}\`;
+        message.channel.send(info);
+    },
+};
+`;
+
+fs.writeFileSync(path.join(commandsDir, 'wave.js'), exampleCommand);
+fs.writeFileSync(path.join(commandsDir, 'ping.js'), pingCommand);
+fs.writeFileSync(path.join(commandsDir, 'joke.js'), jokeCommand);
+fs.writeFileSync(path.join(commandsDir, 'avatar.js'), avatarCommand);
+fs.writeFileSync(path.join(commandsDir, 'serverinfo.js'), serverInfoCommand);
+
+// Login to Discord
+client.login('MTI3NDIwNDE4MjM5NTQ5MDQwNQ.G3GSpv.Uzi_wM-IhcMCoPCs3WNB_dp83_P_EhODT_1Uyw').then(() => {
+    console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Successfully logged in as ${client.user.tag}`);
+}).catch(console.error);
 
 // Handle process exit
 process.on('SIGINT', () => {
@@ -140,8 +221,3 @@ process.on('SIGTERM', () => {
     client.destroy();
     process.exit();
 });
-
-// Log in to Discord
-client.login('YOUR_BOT_TOKEN_HERE').then(() => {
-    console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Successfully logged in as ${client.user.tag}`);
-}).catch(console.error);
