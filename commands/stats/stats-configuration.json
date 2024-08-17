@@ -1,0 +1,13 @@
+{
+    "name": "serverstats",
+    "description": "Displays statistics about the server.",
+    "options": [
+      {
+        "name": "detailed",
+        "type": "BOOLEAN",
+        "description": "Show detailed server statistics.",
+        "required": false
+      }
+    ]
+  }
+  

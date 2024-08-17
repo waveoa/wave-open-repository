@@ -1,0 +1,37 @@
+{
+    "name": "poll",
+    "description": "Create a poll with multiple options.",
+    "options": [
+      {
+        "name": "question",
+        "type": "STRING",
+        "description": "The question to be asked in the poll.",
+        "required": true
+      },
+      {
+        "name": "option1",
+        "type": "STRING",
+        "description": "First poll option.",
+        "required": true
+      },
+      {
+        "name": "option2",
+        "type": "STRING",
+        "description": "Second poll option.",
+        "required": true
+      },
+      {
+        "name": "option3",
+        "type": "STRING",
+        "description": "Third poll option (optional).",
+        "required": false
+      },
+      {
+        "name": "option4",
+        "type": "STRING",
+        "description": "Fourth poll option (optional).",
+        "required": false
+      }
+    ]
+  }
+      

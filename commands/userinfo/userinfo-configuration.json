@@ -1,0 +1,13 @@
+{
+    "name": "userinfo",
+    "description": "Displays information about a user.",
+    "options": [
+      {
+        "name": "target",
+        "type": "USER",
+        "description": "The user to get information about.",
+        "required": true
+      }
+    ]
+  }
+  
