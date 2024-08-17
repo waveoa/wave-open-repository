@@ -25,3 +25,4 @@ module.exports = {
         await message.reply({ embeds: [embed] });
     }
 };
+
