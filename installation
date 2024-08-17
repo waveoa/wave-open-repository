@@ -3,6 +3,11 @@ const fs = require('fs');
 const path = require('path');
 const moment = require('moment');
 
+// Bot configuration
+const TOKEN = 'your-bot-token-here'; // Replace with your bot token
+const PREFIX = '!wave';
+const COMMANDS_DIR = path.join(__dirname, 'commands');
+
 // Initialize the bot
 const client = new Client({
     intents: [
@@ -17,22 +22,36 @@ const client = new Client({
 
 client.commands = new Collection();
 client.cooldowns = new Collection();
-client.prefix = '!wave';
+client.prefix = PREFIX;
 
 // Load commands
-const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
-for (const file of commandFiles) {
-    const command = require(`./commands/${file}`);
-    client.commands.set(command.name, command);
-}
+const loadCommands = () => {
+    const commandFiles = fs.readdirSync(COMMANDS_DIR).filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+        const command = require(path.join(COMMANDS_DIR, file));
+        client.commands.set(command.name, command);
+    }
+};
 
-// Event handlers
-client.once('ready', () => {
-    console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Wave bot is online!`);
-    client.user.setActivity('the waves', { type: 'LISTENING' });
-});
+// Register event handlers
+const registerEventHandlers = () => {
+    client.once('ready', () => {
+        console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Wave bot is online!`);
+        client.user.setActivity('the waves', { type: 'LISTENING' });
+    });
 
-client.on('messageCreate', async message => {
+    client.on('messageCreate', handleCommand);
+    client.on('guildMemberAdd', handleMemberAdd);
+    client.on('guildMemberRemove', handleMemberRemove);
+    client.on('voiceStateUpdate', handleVoiceStateUpdate);
+    client.on('guildCreate', handleGuildCreate);
+    client.on('guildDelete', handleGuildDelete);
+    client.on('error', console.error);
+    client.on('warn', console.warn);
+};
+
+// Handle commands
+const handleCommand = async (message) => {
     if (!message.content.startsWith(client.prefix) || message.author.bot) return;
 
     const args = message.content.slice(client.prefix.length).trim().split(/ +/);
@@ -62,19 +81,12 @@ client.on('messageCreate', async message => {
         return message.channel.send(reply);
     }
 
-    const { cooldowns } = client;
-
-    if (!cooldowns.has(command.name)) {
-        cooldowns.set(command.name, new Collection());
-    }
-
     const now = Date.now();
-    const timestamps = cooldowns.get(command.name);
+    const timestamps = client.cooldowns.get(command.name) || new Collection();
     const cooldownAmount = (command.cooldown || 3) * 1000;
 
     if (timestamps.has(message.author.id)) {
         const expirationTime = timestamps.get(message.author.id) + cooldownAmount;
-
         if (now < expirationTime) {
             const timeLeft = (expirationTime - now) / 1000;
             return message.reply(`Please wait ${timeLeft.toFixed(1)} more second(s) before reusing the \`${command.name}\` command.`);
@@ -82,6 +94,7 @@ client.on('messageCreate', async message => {
     }
 
     timestamps.set(message.author.id, now);
+    client.cooldowns.set(command.name, timestamps);
     setTimeout(() => timestamps.delete(message.author.id), cooldownAmount);
 
     try {
@@ -90,134 +103,115 @@ client.on('messageCreate', async message => {
         console.error(error);
         message.reply('There was an error trying to execute that command!');
     }
-});
+};
 
-client.on('guildMemberAdd', member => {
+// Event handlers
+const handleMemberAdd = (member) => {
     const welcomeChannel = member.guild.channels.cache.find(channel => channel.name === 'welcome');
-    if (!welcomeChannel) return;
-    welcomeChannel.send(`Welcome to the server, ${member.user.tag}! Make sure to read the rules and have fun! 🌊`);
-});
+    if (welcomeChannel) {
+        welcomeChannel.send(`Welcome to the server, ${member.user.tag}! Make sure to read the rules and have fun! 🌊`);
+    }
+};
 
-client.on('guildMemberRemove', member => {
+const handleMemberRemove = (member) => {
     const goodbyeChannel = member.guild.channels.cache.find(channel => channel.name === 'goodbye');
-    if (!goodbyeChannel) return;
-    goodbyeChannel.send(`${member.user.tag} has left the server. Farewell! 🌊`);
-});
+    if (goodbyeChannel) {
+        goodbyeChannel.send(`${member.user.tag} has left the server. Farewell! 🌊`);
+    }
+};
 
-client.on('voiceStateUpdate', (oldState, newState) => {
+const handleVoiceStateUpdate = (oldState, newState) => {
     if (!oldState.channel && newState.channel) {
         console.log(`${newState.member.user.tag} joined voice channel ${newState.channel.name}`);
     } else if (oldState.channel && !newState.channel) {
         console.log(`${oldState.member.user.tag} left voice channel ${oldState.channel.name}`);
     }
-});
+};
 
-client.on('guildCreate', guild => {
+const handleGuildCreate = (guild) => {
     console.log(`Joined new guild: ${guild.name}`);
     const defaultChannel = guild.channels.cache.find(channel => channel.type === 'GUILD_TEXT');
     if (defaultChannel) {
         defaultChannel.send('Hello! I am Wave, your new bot! 🌊');
     }
-});
+};
 
-client.on('guildDelete', guild => {
+const handleGuildDelete = (guild) => {
     console.log(`Left guild: ${guild.name}`);
-});
+};
 
-client.on('error', console.error);
-client.on('warn', console.warn);
-
-// Command Files
-const commandsDir = path.join(__dirname, 'commands');
-if (!fs.existsSync(commandsDir)) {
-    fs.mkdirSync(commandsDir);
+// Create commands directory if it doesn't exist
+if (!fs.existsSync(COMMANDS_DIR)) {
+    fs.mkdirSync(COMMANDS_DIR);
 }
 
-// Example Commands
-const /wave = `
+// Write example command files
+const writeCommandFiles = () => {
+    const commands = [
+        {
+            name: 'wave',
+            description: 'Sends a wave back to the user!',
+            cooldown: 5,
+            execute: `message.channel.send('🌊 Hello there!');`
+        },
+        {
+            name: 'ping',
+            description: 'Ping!',
+            cooldown: 10,
+            execute: `message.channel.send('Pong!');`
+        },
+        {
+            name: 'joke',
+            description: 'Tells a random joke.',
+            cooldown: 10,
+            execute: `const jokes = ['Why don’t scientists trust atoms? Because they make up everything!', 'Why did the scarecrow win an award? Because he was outstanding in his field!', 'What do you call fake spaghetti? An impasta!']; const randomJoke = jokes[Math.floor(Math.random() * jokes.length)]; message.channel.send(randomJoke);`
+        },
+        {
+            name: 'avatar',
+            description: 'Displays the avatar of the user.',
+            args: true,
+            usage: '<user>',
+            execute: `const user = message.mentions.users.first() || message.author; message.channel.send(user.displayAvatarURL({ format: 'png', dynamic: true }));`
+        },
+        {
+            name: 'serverinfo',
+            description: 'Displays information about the server.',
+            execute: `const server = message.guild; const info = \`Server name: ${server.name}\nTotal members: ${server.memberCount}\nRegion: ${server.region}\`; message.channel.send(info);`
+        }
+    ];
+
+    commands.forEach(command => {
+        const commandFileContent = `
 module.exports = {
-    name: 'wave',
-    description: 'Sends a wave back to the user!',
-    cooldown: 5,
+    name: '${command.name}',
+    description: '${command.description}',
+    cooldown: ${command.cooldown},
+    args: ${command.args || false},
+    usage: '${command.usage || ''}',
     execute(message, args) {
-        message.channel.send('🌊 Hello there!');
+        ${command.execute}
     },
+};`;
+        fs.writeFileSync(path.join(COMMANDS_DIR, `${command.name}.js`), commandFileContent);
+    });
 };
-`;
 
-const pingCommand = `
-module.exports = {
-    name: 'ping',
-    description: 'Ping!',
-    cooldown: 10,
-    execute(message) {
-        message.channel.send('Pong!');
-    },
-};
-`;
-
-const jokeCommand = `
-module.exports = {
-    name: 'joke',
-    description: 'Tells a random joke.',
-    cooldown: 10,
-    execute(message) {
-        const jokes = [
-            'Why don’t scientists trust atoms? Because they make up everything!',
-            'Why did the scarecrow win an award? Because he was outstanding in his field!',
-            'What do you call fake spaghetti? An impasta!',
-        ];
-        const randomJoke = jokes[Math.floor(Math.random() * jokes.length)];
-        message.channel.send(randomJoke);
-    },
-};
-`;
-
-const avatarCommand = `
-module.exports = {
-    name: 'avatar',
-    description: 'Displays the avatar of the user.',
-    args: true,
-    usage: '<user>',
-    execute(message, args) {
-        const user = message.mentions.users.first() || message.author;
-        message.channel.send(user.displayAvatarURL({ format: 'png', dynamic: true }));
-    },
-};
-`;
-
-const serverInfoCommand = `
-module.exports = {
-    name: 'serverinfo',
-    description: 'Displays information about the server.',
-    execute(message) {
-        const server = message.guild;
-        const info = \`Server name: ${server.name}\nTotal members: ${server.memberCount}\nRegion: ${server.region}\`;
-        message.channel.send(info);
-    },
-};
-`;
-
-fs.writeFileSync(path.join(commandsDir, 'wave.js'), exampleCommand);
-fs.writeFileSync(path.join(commandsDir, 'ping.js'), pingCommand);
-fs.writeFileSync(path.join(commandsDir, 'joke.js'), jokeCommand);
-fs.writeFileSync(path.join(commandsDir, 'avatar.js'), avatarCommand);
-fs.writeFileSync(path.join(commandsDir, 'serverinfo.js'), serverInfoCommand);
+// Run setup functions
+loadCommands();
+registerEventHandlers();
+writeCommandFiles();
 
 // Login to Discord
-client.login('MTI3NDIwNDE4MjM5NTQ5MDQwNQ.G3GSpv.Uzi_wM-IhcMCoPCs3WNB_dp83_P_EhODT_1Uyw').then(() => {
-    console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Successfully logged in as ${client.user.tag}`);
-}).catch(console.error);
+client.login(TOKEN)
+    .then(() => console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Successfully logged in as ${client.user.tag}`))
+    .catch(console.error);
 
 // Handle process exit
-process.on('SIGINT', () => {
-    console.log('Received SIGINT. Exiting...');
+const handleExit = (signal) => {
+    console.log(`Received ${signal}. Exiting...`);
     client.destroy();
     process.exit();
-});
+};
 
-process.on('SIGTERM', () => {
-    console.log('Received SIGTERM. Exiting...');
-    client.destroy();
-    process.exit();
-});
+process.on('SIGINT', () => handleExit('SIGINT'));
+process.on('SIGTERM', () => handleExit('SIGTERM'));
