@@ -5,7 +5,7 @@ const moment = require('moment');
 
 // Bot configuration
 const TOKEN = 'your-bot-token-here'; // Replace with your bot token
-const PREFIX = '!wave';
+const PREFIX = '-';
 const COMMANDS_DIR = path.join(__dirname, 'commands');
 
 // Initialize the bot
