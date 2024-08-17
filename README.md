@@ -89,8 +89,8 @@ Commands are also handled via slash commands (e.g., `/ping`). Ensure your bot ha
 
 - `index.js`: Main bot script that initializes and starts the bot.
 - `commands/`: Directory containing command files.
-  - `ping.js`: Example command file that handles the `!ping` command.
-  - `info.js`: Example command file that handles the `!info` command.
+  - `ping.js`: Example command file that handles the `-ping` command.
+  - `info.js`: Example command file that handles the `-info` command.
   - Additional command files can be added here.
 - `config.json`: Configuration file containing sensitive information (token, client ID, guild ID).
 
