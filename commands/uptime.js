@@ -10,16 +10,23 @@ module.exports = {
     name: 'uptime',
     cooldown: 5,
     async execute(message, args) {
-        const uptime = process.uptime();
-        const days = Math.floor(uptime / (3600 * 24));
-        const hours = Math.floor((uptime % (3600 * 24)) / 3600);
-        const minutes = Math.floor((uptime % 3600) / 60);
-        const seconds = Math.floor(uptime % 60);
+        try {
+            const uptime = process.uptime();
+            const days = Math.floor(uptime / (3600 * 24));
+            const hours = Math.floor((uptime % (3600 * 24)) / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const seconds = Math.floor(uptime % 60);
 
-        const embed = new MessageEmbed()
-            .setColor('#0099ff')
-            .setTitle('Uptime')
-            .setDescription(`I've been up for ${days}d ${hours}h ${minutes}m ${seconds}s.`)
-            .setTimestamp();
+            const embed = new MessageEmbed()
+                .setColor('#0099ff')
+                .setTitle('Uptime')
+                .setDescription(`I've been up for ${days}d ${hours}h ${minutes}m ${seconds}s.`)
+                .setTimestamp();
 
-        await message.reply({ embeds
+            await message.reply({ embeds: [embed] });
+        } catch (error) {
+            console.error('Error executing uptime command:', error);
+            await message.reply('There was an error trying to execute that command!');
+        }
+    }
+};
