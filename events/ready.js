@@ -1,217 +1,25 @@
-const { Client, GatewayIntentBits, Collection } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
-const moment = require('moment');
+// events/ready.js
+const { MessageEmbed } = require('discord.js');
 
-// Bot configuration
-const TOKEN = 'your-bot-token-here'; // Replace with your bot token
-const PREFIX = '-';
-const COMMANDS_DIR = path.join(__dirname, 'commands');
-
-// Initialize the bot
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildPresences
-    ]
-});
-
-client.commands = new Collection();
-client.cooldowns = new Collection();
-client.prefix = PREFIX;
-
-// Load commands
-const loadCommands = () => {
-    const commandFiles = fs.readdirSync(COMMANDS_DIR).filter(file => file.endsWith('.js'));
-    for (const file of commandFiles) {
-        const command = require(path.join(COMMANDS_DIR, file));
-        client.commands.set(command.name, command);
-    }
-};
-
-// Register event handlers
-const registerEventHandlers = () => {
-    client.once('ready', () => {
-        console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Wave bot is online!`);
-        client.user.setActivity('the waves', { type: 'LISTENING' });
-    });
-
-    client.on('messageCreate', handleCommand);
-    client.on('guildMemberAdd', handleMemberAdd);
-    client.on('guildMemberRemove', handleMemberRemove);
-    client.on('voiceStateUpdate', handleVoiceStateUpdate);
-    client.on('guildCreate', handleGuildCreate);
-    client.on('guildDelete', handleGuildDelete);
-    client.on('error', console.error);
-    client.on('warn', console.warn);
-};
-
-// Handle commands
-const handleCommand = async (message) => {
-    if (!message.content.startsWith(client.prefix) || message.author.bot) return;
-
-    const args = message.content.slice(client.prefix.length).trim().split(/ +/);
-    const commandName = args.shift().toLowerCase();
-
-    const command = client.commands.get(commandName)
-        || client.commands.find(cmd => cmd.aliases && cmd.aliases.includes(commandName));
-
-    if (!command) return;
-
-    if (command.guildOnly && message.channel.type !== 'GUILD_TEXT') {
-        return message.reply('I can\'t execute that command inside DMs!');
-    }
-
-    if (command.permissions) {
-        const authorPerms = message.channel.permissionsFor(message.author);
-        if (!authorPerms || !authorPerms.has(command.permissions)) {
-            return message.reply('You do not have permissions to execute this command.');
-        }
-    }
-
-    if (command.args && !args.length) {
-        let reply = `You didn't provide any arguments, ${message.author}!`;
-        if (command.usage) {
-            reply += `\nThe proper usage would be: \`${client.prefix}${command.name} ${command.usage}\``;
-        }
-        return message.channel.send(reply);
-    }
-
-    const now = Date.now();
-    const timestamps = client.cooldowns.get(command.name) || new Collection();
-    const cooldownAmount = (command.cooldown || 3) * 1000;
-
-    if (timestamps.has(message.author.id)) {
-        const expirationTime = timestamps.get(message.author.id) + cooldownAmount;
-        if (now < expirationTime) {
-            const timeLeft = (expirationTime - now) / 1000;
-            return message.reply(`Please wait ${timeLeft.toFixed(1)} more second(s) before reusing the \`${command.name}\` command.`);
-        }
-    }
-
-    timestamps.set(message.author.id, now);
-    client.cooldowns.set(command.name, timestamps);
-    setTimeout(() => timestamps.delete(message.author.id), cooldownAmount);
-
-    try {
-        await command.execute(message, args);
-    } catch (error) {
-        console.error(error);
-        message.reply('There was an error trying to execute that command!');
-    }
-};
-
-// Event handlers
-const handleMemberAdd = (member) => {
-    const welcomeChannel = member.guild.channels.cache.find(channel => channel.name === 'welcome');
-    if (welcomeChannel) {
-        welcomeChannel.send(`Welcome to the server, ${member.user.tag}! Make sure to read the rules and have fun! 🌊`);
-    }
-};
-
-const handleMemberRemove = (member) => {
-    const goodbyeChannel = member.guild.channels.cache.find(channel => channel.name === 'goodbye');
-    if (goodbyeChannel) {
-        goodbyeChannel.send(`${member.user.tag} has left the server. Farewell! 🌊`);
-    }
-};
-
-const handleVoiceStateUpdate = (oldState, newState) => {
-    if (!oldState.channel && newState.channel) {
-        console.log(`${newState.member.user.tag} joined voice channel ${newState.channel.name}`);
-    } else if (oldState.channel && !newState.channel) {
-        console.log(`${oldState.member.user.tag} left voice channel ${oldState.channel.name}`);
-    }
-};
-
-const handleGuildCreate = (guild) => {
-    console.log(`Joined new guild: ${guild.name}`);
-    const defaultChannel = guild.channels.cache.find(channel => channel.type === 'GUILD_TEXT');
-    if (defaultChannel) {
-        defaultChannel.send('Hello! I am Wave, your new bot! 🌊');
-    }
-};
-
-const handleGuildDelete = (guild) => {
-    console.log(`Left guild: ${guild.name}`);
-};
-
-// Create commands directory if it doesn't exist
-if (!fs.existsSync(COMMANDS_DIR)) {
-    fs.mkdirSync(COMMANDS_DIR);
-}
-
-// Write example command files
-const writeCommandFiles = () => {
-    const commands = [
-        {
-            name: 'wave',
-            description: 'Sends a wave back to the user!',
-            cooldown: 5,
-            execute: `message.channel.send('🌊 Hello there!');`
-        },
-        {
-            name: 'ping',
-            description: 'Ping!',
-            cooldown: 10,
-            execute: `message.channel.send('Pong!');`
-        },
-        {
-            name: 'joke',
-            description: 'Tells a random joke.',
-            cooldown: 10,
-            execute: `const jokes = ['Why don’t scientists trust atoms? Because they make up everything!', 'Why did the scarecrow win an award? Because he was outstanding in his field!', 'What do you call fake spaghetti? An impasta!']; const randomJoke = jokes[Math.floor(Math.random() * jokes.length)]; message.channel.send(randomJoke);`
-        },
-        {
-            name: 'avatar',
-            description: 'Displays the avatar of the user.',
-            args: true,
-            usage: '<user>',
-            execute: `const user = message.mentions.users.first() || message.author; message.channel.send(user.displayAvatarURL({ format: 'png', dynamic: true }));`
-        },
-        {
-            name: 'serverinfo',
-            description: 'Displays information about the server.',
-            execute: `const server = message.guild; const info = \`Server name: ${server.name}\nTotal members: ${server.memberCount}\nRegion: ${server.region}\`; message.channel.send(info);`
-        }
-    ];
-
-    commands.forEach(command => {
-        const commandFileContent = `
 module.exports = {
-    name: '${command.name}',
-    description: '${command.description}',
-    cooldown: ${command.cooldown},
-    args: ${command.args || false},
-    usage: '${command.usage || ''}',
-    execute(message, args) {
-        ${command.execute}
-    },
-};`;
-        fs.writeFileSync(path.join(COMMANDS_DIR, `${command.name}.js`), commandFileContent);
-    });
+    name: 'ready',
+    once: true,
+    async execute(client) {
+        console.log(`Logged in as ${client.user.tag}!`);
+        client.user.setActivity('Supporting other bots', { type: 'WATCHING' });
+
+        // Send a startup message to a specific channel
+        const channel = client.channels.cache.get(process.env.STARTUP_CHANNEL_ID);
+        if (channel) {
+            const embed = new MessageEmbed()
+                .setColor('#0099ff')
+                .setTitle('Bot Started')
+                .setDescription('The bot has successfully started!')
+                .setTimestamp();
+
+            channel.send({ embeds: [embed] });
+        } else {
+            console.warn('Startup channel not found.');
+        }
+    }
 };
-
-// Run setup functions
-loadCommands();
-registerEventHandlers();
-writeCommandFiles();
-
-// Login to Discord
-client.login(TOKEN)
-    .then(() => console.log(`[${moment().format('YYYY-MM-DD HH:mm:ss')}] Successfully logged in as ${client.user.tag}`))
-    .catch(console.error);
-
-// Handle process exit
-const handleExit = (signal) => {
-    console.log(`Received ${signal}. Exiting...`);
-    client.destroy();
-    process.exit();
-};
-
-process.on('SIGINT', () => handleExit('SIGINT'));
-process.on('SIGTERM', () => handleExit('SIGTERM'));
