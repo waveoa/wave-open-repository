@@ -9,6 +9,7 @@ This document outlines the security measures and policies for the bot. The bot p
 | Version | Supported          |
 | ------- | ------------------ |
 | v0.3.7  | :white_check_mark: |
+| v0.3.8  | :white_check_mark: |
 
 ## Bot Token Security
 
