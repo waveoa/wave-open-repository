@@ -24,7 +24,7 @@ Wave is a feature-rich Discord bot built using the `discord.js` library. This bo
 1. **Clone the Repository**
 
    ```bash
-   git clone https://github.com/yourusername/wave-discord-bot.git
+   [git clone https://github.com/waveoa/wave-open-repository.git
    cd wave-discord-bot
    ```
 
